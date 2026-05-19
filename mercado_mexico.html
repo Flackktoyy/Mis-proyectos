@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JARVIS · Mapa de Mercado México</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#070b14;color:#cce0ff;font-family:'Courier New',monospace;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+
+#header{padding:10px 20px;background:linear-gradient(90deg,#001428,#002040);border-bottom:1px solid #00d4ff25;display:flex;align-items:center;justify-content:space-between}
+#header h1{font-size:17px;color:#00d4ff;letter-spacing:3px;text-transform:uppercase}
+#header p{font-size:13px;color:#3a5577;margin-top:2px}
+#main{display:flex;flex:1;overflow:hidden}
+#map{flex:1;transition:all 0.3s}
+
+#panel{width:0;overflow:hidden;padding:0;background:#03080f;border-left:1px solid #00d4ff15;display:flex;flex-direction:column;transition:width 0.3s ease,padding 0.3s ease}
+#panel.open{width:520px;overflow-y:auto;padding:20px;gap:10px}
+
+#panel h2{font-size:20px;color:#00d4ff;border-bottom:1px solid #00d4ff25;padding-bottom:8px;margin-bottom:4px;white-space:nowrap}
+
+.badge{display:inline-block;padding:5px 13px;border-radius:4px;font-size:13px;font-weight:bold;letter-spacing:1px}
+.alta{background:#00ff8818;color:#00ff88;border:1px solid #00ff8840}
+.media{background:#ffaa0018;color:#ffaa00;border:1px solid #ffaa0040}
+.baja{background:#ff444418;color:#ff6666;border:1px solid #ff444440}
+.seg-muy-segura{background:#00ff8818;color:#00ff88;border:1px solid #00ff8840}
+.seg-segura{background:#44ff8818;color:#66ff99;border:1px solid #44ff8840}
+.seg-moderada{background:#ffdd0018;color:#ffdd00;border:1px solid #ffdd0040}
+.seg-insegura{background:#ff880018;color:#ffaa55;border:1px solid #ff880040}
+.seg-muy-insegura{background:#ff222218;color:#ff6666;border:1px solid #ff222240}
+.ter-plana{background:#00aaff18;color:#44ccff;border:1px solid #00aaff40}
+.ter-poca{background:#8899ff18;color:#aabbff;border:1px solid #8899ff40}
+.ter-accidentada{background:#ff880018;color:#ffaa55;border:1px solid #ff880040}
+.ter-muy-accidentada{background:#ff330018;color:#ff7777;border:1px solid #ff330040}
+
+.stat-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #0a1a2a;min-height:38px}
+.stat-label{font-size:14px;color:#4466aa;flex-shrink:0;margin-right:8px}
+.stat-value{font-size:14px;color:#99bbdd;text-align:right}
+
+.gas-box{background:#02101e;border:1px solid #00d4ff18;border-radius:5px;padding:12px 14px;margin-top:6px}
+.gas-title{font-size:11px;color:#00d4ff66;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid #00d4ff15}
+.gas-row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #071520}
+.gas-label{font-size:13px;color:#4466aa}
+.gas-value{font-size:13px;color:#88bbdd;text-align:right}
+.gas-total-row{display:flex;justify-content:space-between;padding:7px 0;margin-top:2px}
+.gas-total-label{font-size:14px;color:#00d4ff;font-weight:bold}
+.gas-total-value{font-size:14px;color:#00d4ff;font-weight:bold}
+.gas-note{font-size:11px;color:#1a3a55;margin-top:8px;line-height:1.5}
+
+.city-card{background:#050e1c;border:1px solid #0d2040;border-radius:5px;padding:13px 14px;display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;cursor:pointer;transition:background 0.15s,border-color 0.15s}
+.city-card:hover{background:#091828;border-color:#00d4ff44}
+.city-name{font-size:16px;color:#bbd8f5;font-weight:bold}
+.city-sub{font-size:12px;color:#2a4466;margin-top:3px}
+
+.dots{display:flex;gap:4px;margin-top:4px}
+.dot{width:12px;height:12px;border-radius:50%;background:#0d1e33}
+.dot.on{background:#00d4ff;box-shadow:0 0 5px #00d4ff66}
+
+.section-label{font-size:12px;color:#2a4466;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;margin-top:12px;padding-top:7px;border-top:1px solid #0a1a2a}
+
+.back-btn{font-size:13px;color:#00d4ff;cursor:pointer;border:1px solid #00d4ff30;padding:7px 15px;border-radius:4px;background:#001828;display:inline-block;margin-bottom:12px}
+.back-btn:hover{background:#002040}
+
+.gmaps-btn{display:block;text-align:center;font-size:14px;color:#00d4ff;border:1px solid #00d4ff35;padding:10px;border-radius:4px;background:#001828;cursor:pointer;margin-top:10px;text-decoration:none;letter-spacing:1px}
+.gmaps-btn:hover{background:#002040}
+
+.mkt-si{color:#00ff88;font-size:14px;font-weight:bold}
+.mkt-no{color:#ff6666;font-size:14px;font-weight:bold}
+.mkt-nd{color:#445566;font-size:13px}
+.mkt-warn{font-size:12px;color:#334455;margin-top:8px;padding:7px 9px;border:1px solid #0a1e30;border-radius:3px;line-height:1.6}
+
+.city-detail-header{font-size:19px;color:#00d4ff;margin-bottom:2px;font-weight:bold}
+.city-pob-big{font-size:13px;color:#334455;margin-bottom:12px}
+
+#legend{display:flex;gap:14px;align-items:center}
+.leg-item{display:flex;align-items:center;gap:5px;font-size:13px;color:#3a5577}
+.leg-dot{width:10px;height:10px;border-radius:50%}
+
+.leaflet-tooltip{background:#001020!important;border:1px solid #00d4ff25!important;color:#00d4ff!important;font-family:'Courier New',monospace!important;font-size:13px!important;padding:4px 8px!important;border-radius:3px!important;box-shadow:none!important}
+.leaflet-tooltip-tip{display:none}
+.leaflet-bar a,.leaflet-bar a:hover{background:#001828!important;color:#00d4ff!important;border-color:#00d4ff25!important}
+
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:#030810}
+::-webkit-scrollbar-thumb{background:#0d3050;border-radius:4px}
+
+#hint{position:absolute;bottom:40px;left:50%;transform:translateX(-50%);background:#001828dd;color:#00d4ff88;font-size:13px;padding:8px 18px;border-radius:20px;border:1px solid #00d4ff20;pointer-events:none;letter-spacing:1px}
+
+.close-btn{position:absolute;top:8px;right:12px;background:#03080f;border:1px solid #00d4ff40;color:#00d4ff;width:32px;height:32px;border-radius:4px;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;transition:all 0.2s;z-index:10000;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;outline:none}
+.close-btn:hover,.close-btn:focus,.close-btn:active{background:#00d4ff15;border-color:#00d4ff70;outline:none}
+
+@media(max-width:1024px){
+  #panel.open{width:100%!important;position:fixed;bottom:0;left:0;right:0;max-height:80vh;border-left:none;border-top:1px solid #00d4ff15;border-radius:15px 15px 0 0;padding:40px 20px 20px!important;overflow-y:auto;z-index:9999}
+  #map{flex:1;height:100%}
+  #header{flex-direction:column;gap:10px;padding:8px 15px}
+  #header h1{font-size:14px}
+  #header p{font-size:11px}
+  #legend{font-size:11px;gap:8px;flex-wrap:wrap}
+  .leg-item{font-size:11px}
+  #panel h2{font-size:16px;padding-bottom:6px}
+  .stat-row{padding:6px 0;min-height:32px}
+  .stat-label{font-size:12px}
+  .stat-value{font-size:12px}
+  .city-card{padding:10px 12px;margin-bottom:5px}
+  .city-name{font-size:14px}
+  .city-sub{font-size:11px}
+  .gas-box{padding:10px 12px}
+  .gas-title{font-size:10px}
+  .gas-row{padding:4px 0}
+  .gas-label{font-size:12px}
+  .gas-value{font-size:12px}
+}
+
+@media(max-width:768px){
+  #header h1{font-size:13px;letter-spacing:2px}
+  #header p{font-size:10px}
+  #legend{gap:5px;font-size:10px}
+  #panel.open{width:100%;max-height:75vh;padding-top:35px;padding:15px}
+  #panel h2{font-size:15px}
+  .stat-row{padding:5px 0;min-height:28px;font-size:11px}
+  .stat-label{font-size:11px}
+  .stat-value{font-size:11px}
+  .city-card{padding:8px 10px;margin-bottom:4px}
+  .city-name{font-size:13px}
+  .city-detail-header{font-size:16px}
+  .back-btn{font-size:12px;padding:6px 12px}
+  .gmaps-btn{font-size:12px;padding:8px}
+  .gas-box{padding:8px 10px;margin-top:5px}
+  .gas-title{font-size:9px;margin-bottom:6px}
+  .gas-row{padding:3px 0}
+  .gas-label{font-size:11px}
+  .gas-value{font-size:11px}
+  .gas-total-label{font-size:12px}
+  .gas-total-value{font-size:12px}
+  .mkt-warn{font-size:10px;padding:5px 7px}
+  .section-label{font-size:11px;margin-top:10px;margin-bottom:6px}
+}
+</style>
+</head>
+<body>
+<div id="header">
+  <div>
+    <h1>JARVIS &middot; Mapa de Mercado &mdash; México</h1>
+    <p>Click en un estado &bull; Click en ciudad para detalle completo &bull; Pintura marketplace</p>
+  </div>
+  <div id="legend">
+    <div class="leg-item"><div class="leg-dot" style="background:#00ff88"></div>Economía Alta</div>
+    <div class="leg-item"><div class="leg-dot" style="background:#ffaa00"></div>Media</div>
+    <div class="leg-item"><div class="leg-dot" style="background:#ff5555"></div>Baja</div>
+  </div>
+</div>
+<div id="main" style="position:relative">
+  <div id="map"></div>
+  <div id="hint">Selecciona un estado en el mapa</div>
+  <div id="panel">
+    <button class="close-btn" id="close-panel" style="display:none">✕</button>
+    <div id="state-view" style="display:none">
+      <h2 id="est-nombre"></h2>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+        <span id="est-badge" class="badge">—</span>
+      </div>
+      <div class="stat-row"><span class="stat-label">Población estatal</span><span id="est-pob" class="stat-value"></span></div>
+      <div class="stat-row"><span class="stat-label">Nivel económico</span><span id="est-gdp" class="stat-value"></span></div>
+      <div class="stat-row"><span class="stat-label">Saturación Comex</span><span id="est-comex" class="stat-value"></span></div>
+      <div class="stat-row"><span class="stat-label">Marketplace activo</span><span id="est-mp" class="stat-value"></span></div>
+      <div class="section-label">Ciudades &mdash; click para ver detalle</div>
+      <div id="ciudades"></div>
+    </div>
+
+    <div id="city-view" style="display:none">
+      <div class="back-btn" id="back-btn">&#8592; Volver al estado</div>
+      <div class="city-detail-header" id="city-nombre"></div>
+      <div class="city-pob-big" id="city-pob"></div>
+
+      <div class="stat-row"><span class="stat-label">Habitantes</span><span id="city-hab" class="stat-value"></span></div>
+      <div class="stat-row"><span class="stat-label">Zona urbana aprox.</span><span id="city-area" class="stat-value"></span></div>
+      <div class="stat-row"><span class="stat-label">Terreno / Calles</span><span id="city-terrain" class="stat-value"></span></div>
+      <div class="stat-row"><span class="stat-label">Seguridad</span><span id="city-security" class="stat-value"></span></div>
+      <div class="stat-row"><span class="stat-label">Tiendas Comex (est.)</span><span id="city-comex" class="stat-value"></span></div>
+
+      <div class="section-label">Ruta desde Cancún &mdash; Gasolina Magna + Casetas</div>
+
+      <div class="gas-box">
+        <div class="gas-title">&#128739; Vía cuota (carretera de paga)</div>
+        <div class="gas-row"><span class="gas-label">Distancia</span><span class="gas-value" id="cq-dist"></span></div>
+        <div class="gas-row"><span class="gas-label">Gasolina solo ida</span><span class="gas-value" id="cq-gas"></span></div>
+        <div class="gas-row"><span class="gas-label">Casetas aprox.</span><span class="gas-value" id="cq-casetas"></span></div>
+        <div class="gas-total-row"><span class="gas-total-label">TOTAL ida</span><span class="gas-total-value" id="cq-total"></span></div>
+      </div>
+
+      <div class="gas-box" style="margin-top:8px">
+        <div class="gas-title">&#128663; Vía libre (carretera federal)</div>
+        <div class="gas-row"><span class="gas-label">Distancia</span><span class="gas-value" id="cl-dist"></span></div>
+        <div class="gas-row"><span class="gas-label">Gasolina solo ida</span><span class="gas-value" id="cl-gas"></span></div>
+        <div class="gas-row"><span class="gas-label">Casetas obligatorias</span><span class="gas-value" id="cl-casetas"></span></div>
+        <div class="gas-total-row"><span class="gas-total-label">TOTAL ida</span><span class="gas-total-value" id="cl-total"></span></div>
+        <div class="gas-note" id="cl-nota"></div>
+      </div>
+
+      <div class="section-label">Marketplace FB &mdash; Pintura / Cubetas</div>
+      <div class="stat-row"><span class="stat-label">Vendedores activos</span><span id="city-mkt-activo" class="stat-value"></span></div>
+      <div class="stat-row"><span class="stat-label">Precio observado</span><span id="city-mkt-precio" class="stat-value"></span></div>
+      <div class="stat-row"><span class="stat-label">Notas</span><span id="city-mkt-notas" class="stat-value"></span></div>
+      <div class="mkt-warn">Datos marketplace no se pueden verificar en tiempo real. Los confirmados vienen de tu experiencia. El resto son estimados.</div>
+
+      <div class="section-label">Viabilidad de venta</div>
+      <div class="dots" id="city-dots" style="margin-bottom:10px"></div>
+      <a id="city-gmaps" class="gmaps-btn" target="_blank">Ver ciudad en Google Maps</a>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+const MAGNA_PRECIO  = 24.50; // MXN/L Cancún mayo 2026
+const KM_POR_LITRO  = 15;    // rendimiento real mixto (carretera + ciudad)
+
+function terrainClass(t){
+  if(t==="Plana") return "ter-plana";
+  if(t==="Poca pendiente") return "ter-poca";
+  if(t==="Accidentada") return "ter-accidentada";
+  return "ter-muy-accidentada";
+}
+function secClass(s){
+  return{"Muy segura":"seg-muy-segura","Segura":"seg-segura","Moderada":"seg-moderada","Insegura":"seg-insegura","Muy insegura":"seg-muy-insegura"}[s]||"seg-moderada";
+}
+function fmt(n){return "$"+Math.round(n).toLocaleString("es-MX");}
+function formatPop(p){return p>=1000000?(p/1e6).toFixed(2)+" M hab.":(p/1000).toFixed(0)+" K hab.";}
+function dotsHtml(v){return Array(5).fill(0).map((_,i)=>`<div class="dot${i<Math.round(v/2)?" on":""}"></div>`).join("");}
+
+// cc=casetas cuota MXN, cl=casetas libre MXN (obligatorias), nota=comentario libre
+const ESTADOS={
+  "Aguascalientes":{pob:"1.4M",gdp:"Medio-Alto",comex:"Media",mp:"Alta",nivel:"media",ciudades:[
+    {n:"Aguascalientes",p:944285,v:7,lat:21.885,lng:-102.291,area:130,terrain:"Plana",security:"Muy segura",comex:25,d:2240,cc:1200,cl:385,nota:"Libre viable, tarda +4h aprox.",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Calvillo",p:60000,v:4,lat:21.847,lng:-102.718,area:15,terrain:"Accidentada",security:"Segura",comex:3,d:2260,cc:1210,cl:388,nota:"Pueblo grande — libre disponible",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Jesús María",p:290000,v:6,lat:21.967,lng:-102.337,area:163,terrain:"Plana",security:"Muy segura",comex:10,d:2245,cc:1203,cl:386,nota:"Conurbación norte de Aguascalientes capital",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Pabellón de Arteaga",p:60000,v:4,lat:22.148,lng:-102.277,area:130,terrain:"Plana",security:"Segura",comex:3,d:2230,cc:1196,cl:384,nota:"Ciudad pequeña al norte — libre disponible",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Rincón de Romos",p:58000,v:4,lat:22.234,lng:-102.321,area:155,terrain:"Plana",security:"Segura",comex:2,d:2235,cc:1198,cl:385,nota:"Ciudad pequeña — libre disponible",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}}
+  ]},
+  "Baja California":{pob:"3.8M",gdp:"Alto",comex:"Alta",mp:"Muy Alta",nivel:"alta",ciudades:[
+    {n:"Tijuana",p:1922523,v:7,lat:32.514,lng:-117.038,area:160,terrain:"Muy accidentada",security:"Insegura",comex:45,d:4250,cc:2500,cl:760,nota:"Ruta extrema — considerar vuelo",market:{activo:null,precio:"—",notas:"Mercado enorme, pero calles muy empinadas"}},
+    {n:"Mexicali",p:1049792,v:7,lat:32.624,lng:-115.452,area:115,terrain:"Plana",security:"Moderada",comex:28,d:4060,cc:2400,cl:730,nota:"Ruta extrema",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Ensenada",p:483536,v:5,lat:31.867,lng:-116.596,area:45,terrain:"Accidentada",security:"Moderada",comex:12,d:4340,cc:2550,cl:780,nota:"Ruta extrema",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Rosarito",p:107000,v:4,lat:32.370,lng:-117.065,area:20,terrain:"Muy accidentada",security:"Moderada",comex:5,d:4260,cc:2510,cl:762,nota:"Ruta extrema — ciudad pequeña",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Tecate",p:105000,v:4,lat:32.574,lng:-116.628,area:18,terrain:"Accidentada",security:"Moderada",comex:4,d:4150,cc:2450,cl:750,nota:"Ruta extrema — ciudad pequeña",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}}
+  ]},
+  "Baja California Sur":{pob:"0.8M",gdp:"Alto",comex:"Baja",mp:"Media",nivel:"alta",ciudades:[
+    {n:"La Paz",p:314345,v:6,lat:24.143,lng:-110.313,area:40,terrain:"Poca pendiente",security:"Segura",comex:10,d:4850,cc:2700,cl:0,nota:"Requiere ferry Mazatlán-La Paz (~$600-800 por persona). No aplica ruta libre normal.",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Los Cabos",p:351111,v:6,lat:22.891,lng:-109.916,area:35,terrain:"Poca pendiente",security:"Moderada",comex:8,d:4960,cc:2750,cl:0,nota:"Requiere ferry — no es ruta en auto continua",market:{activo:null,precio:"—",notas:"Zona turística, precio puede subir"}}
+  ]},
+  "Campeche":{pob:"0.9M",gdp:"Alto (petróleo)",comex:"Baja",mp:"Media",nivel:"media",ciudades:[
+    {n:"Campeche",p:320428,v:5,lat:19.845,lng:-90.527,area:40,terrain:"Plana",security:"Muy segura",comex:10,d:480,cc:185,cl:60,nota:"Libre disponible vía 180, agrega ~1h",market:{activo:false,precio:"—",notas:"Poca competencia — posible oportunidad"}},
+    {n:"Cd. del Carmen",p:221370,v:5,lat:18.649,lng:-91.838,area:30,terrain:"Plana",security:"Moderada",comex:8,d:685,cc:260,cl:100,nota:"Puentes con caseta obligatoria en ambas rutas",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Champotón",p:45000,v:3,lat:19.350,lng:-90.718,area:12,terrain:"Plana",security:"Segura",comex:2,d:535,cc:200,cl:70,nota:"Ciudad pequeña — entre Campeche y Mérida",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Escárcega",p:38000,v:2,lat:18.609,lng:-90.732,area:10,terrain:"Plana",security:"Moderada",comex:2,d:620,cc:235,cl:80,nota:"Pueblo grande — cruce de rutas",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}}
+  ]},
+  "Chiapas":{pob:"5.5M",gdp:"Bajo",comex:"Baja",mp:"Baja",nivel:"baja",ciudades:[
+    {n:"Tuxtla Gutiérrez",p:598710,v:4,lat:16.752,lng:-93.115,area:55,terrain:"Poca pendiente",security:"Moderada",comex:18,d:1100,cc:450,cl:160,nota:"Libre más lenta por montaña",market:{activo:null,precio:"—",notas:"Poder adquisitivo bajo"}},
+    {n:"Tapachula",p:353063,v:3,lat:14.899,lng:-92.263,area:40,terrain:"Plana",security:"Insegura",comex:12,d:1380,cc:550,cl:200,nota:"Ruta fronteriza, precaución",market:{activo:null,precio:"—",notas:"Zona fronteriza, precaución"}},
+    {n:"San Cristóbal",p:215582,v:3,lat:16.737,lng:-92.637,area:25,terrain:"Accidentada",security:"Moderada",comex:6,d:1120,cc:460,cl:165,nota:"Montaña — libre muy lenta",market:{activo:null,precio:"—",notas:"Ciudad turística pero economía baja"}},
+    {n:"Comitán",p:98000,v:3,lat:16.255,lng:-92.134,area:20,terrain:"Accidentada",security:"Moderada",comex:4,d:1250,cc:500,cl:180,nota:"Libre disponible — zona sur del estado",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Palenque",p:42000,v:3,lat:17.511,lng:-92.043,area:12,terrain:"Plana",security:"Moderada",comex:2,d:800,cc:330,cl:100,nota:"Zona arqueológica — turístico",market:{activo:null,precio:"—",notas:"Pueblo turístico, poder adquisitivo bajo"}},
+    {n:"Tonalá",p:100000,v:3,lat:16.083,lng:-93.767,area:900,terrain:"Plana",security:"Moderada",comex:4,d:1150,cc:470,cl:168,nota:"Libre disponible — no confundir con Tonalá Jalisco",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Ocosingo",p:95000,v:3,lat:16.907,lng:-92.094,area:7200,terrain:"Accidentada",security:"Moderada",comex:3,d:900,cc:370,cl:115,nota:"Libre disponible — zona selva",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}}
+  ]},
+  "Chihuahua":{pob:"3.7M",gdp:"Alto",comex:"Media",mp:"Alta",nivel:"alta",ciudades:[
+    {n:"Ciudad Juárez",p:1512450,v:7,lat:31.738,lng:-106.487,area:295,terrain:"Plana",security:"Insegura",comex:40,d:3950,cc:2300,cl:700,nota:"Distancia extrema — considerar vuelo",market:{activo:null,precio:"—",notas:"Ciudad grande, verificar antes de ir"}},
+    {n:"Chihuahua",p:925147,v:8,lat:28.635,lng:-106.089,area:230,terrain:"Plana",security:"Moderada",comex:30,d:3540,cc:2100,cl:650,nota:"Distancia extrema",market:{activo:null,precio:"—",notas:"Capital estatal, buena oportunidad"}},
+    {n:"Cuauhtémoc",p:172000,v:5,lat:28.412,lng:-106.874,area:40,terrain:"Plana",security:"Moderada",comex:8,d:3560,cc:2120,cl:650,nota:"Ciudad menonita — distancia extrema",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Delicias",p:130000,v:5,lat:28.192,lng:-105.469,area:35,terrain:"Plana",security:"Moderada",comex:6,d:3380,cc:2020,cl:620,nota:"Distancia extrema",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Parral",p:104000,v:4,lat:26.932,lng:-105.667,area:30,terrain:"Accidentada",security:"Moderada",comex:5,d:3350,cc:2000,cl:615,nota:"Distancia extrema",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Nuevo Casas Grandes",p:70000,v:4,lat:30.420,lng:-107.919,area:3950,terrain:"Plana",security:"Moderada",comex:3,d:3680,cc:2170,cl:668,nota:"Distancia extrema — zona noroeste",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Camargo",p:52000,v:4,lat:27.675,lng:-105.167,area:6770,terrain:"Plana",security:"Moderada",comex:2,d:3340,cc:1990,cl:613,nota:"Libre disponible — centro del estado",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}}
+  ]},
+  "Ciudad de México":{pob:"9.2M",gdp:"Muy Alto",comex:"Muy Alta",mp:"Muy Alta",nivel:"alta",ciudades:[
+    {n:"CDMX",p:9209944,v:9,lat:19.432,lng:-99.133,area:1485,terrain:"Poca pendiente",security:"Moderada",comex:250,d:1900,cc:1050,cl:360,nota:"Libre posible vía 180+150 pero agrega +3h. Accesos CDMX tienen caseta obligatoria.",market:{activo:true,precio:"$700-800",notas:"Competencia alta, pero mercado enorme"}}
+  ]},
+  "Coahuila":{pob:"3.1M",gdp:"Alto",comex:"Media",mp:"Alta",nivel:"alta",ciudades:[
+    {n:"Saltillo",p:807537,v:8,lat:25.421,lng:-100.997,area:70,terrain:"Accidentada",security:"Segura",comex:25,d:2130,cc:1150,cl:370,nota:"Libre viable, agrega ~2h",market:{activo:null,precio:"—",notas:"Ciudad industrial fuerte"}},
+    {n:"Torreón",p:702830,v:8,lat:25.542,lng:-103.418,area:235,terrain:"Plana",security:"Moderada",comex:25,d:2340,cc:1250,cl:400,nota:"Libre disponible",market:{activo:null,precio:"—",notas:"Conurbación grande, oportunidad"}},
+    {n:"Monclova",p:241254,v:6,lat:26.906,lng:-101.421,area:30,terrain:"Plana",security:"Segura",comex:8,d:2230,cc:1190,cl:382,nota:"Libre disponible",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Piedras Negras",p:170000,v:5,lat:28.700,lng:-100.523,area:35,terrain:"Plana",security:"Moderada",comex:8,d:2280,cc:1220,cl:392,nota:"Ciudad fronteriza — libre disponible",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Acuña",p:145000,v:5,lat:29.323,lng:-100.937,area:30,terrain:"Plana",security:"Moderada",comex:6,d:2350,cc:1255,cl:405,nota:"Ciudad fronteriza",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Ramos Arizpe",p:90000,v:6,lat:25.541,lng:-100.958,area:2410,terrain:"Accidentada",security:"Segura",comex:5,d:2140,cc:1152,cl:371,nota:"Libre disponible — zona industrial clave",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"San Pedro de las Colonias",p:70000,v:5,lat:25.749,lng:-102.989,area:2840,terrain:"Plana",security:"Moderada",comex:4,d:2320,cc:1240,cl:398,nota:"Libre disponible — zona agroindustrial",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}}
+  ]},
+  "Colima":{pob:"0.8M",gdp:"Medio",comex:"Baja",mp:"Media",nivel:"media",ciudades:[
+    {n:"Manzanillo",p:217969,v:4,lat:19.105,lng:-104.338,area:30,terrain:"Poca pendiente",security:"Insegura",comex:8,d:2470,cc:1280,cl:390,nota:"Libre disponible vía 200 costera",market:{activo:null,precio:"—",notas:"Estado peligroso, precaución"}},
+    {n:"Colima",p:166226,v:4,lat:19.245,lng:-103.725,area:25,terrain:"Poca pendiente",security:"Insegura",comex:6,d:2440,cc:1270,cl:388,nota:"Libre disponible",market:{activo:null,precio:"—",notas:"No recomendado por inseguridad"}},
+    {n:"Tecomán",p:110000,v:3,lat:18.906,lng:-103.875,area:20,terrain:"Plana",security:"Insegura",comex:4,d:2470,cc:1280,cl:390,nota:"Libre disponible — precaución",market:{activo:null,precio:"—",notas:"Ciudad pequeña, zona insegura"}}
+  ]},
+  "Durango":{pob:"1.8M",gdp:"Medio",comex:"Baja",mp:"Media",nivel:"media",ciudades:[
+    {n:"Durango",p:706830,v:6,lat:24.024,lng:-104.658,area:85,terrain:"Poca pendiente",security:"Moderada",comex:20,d:2530,cc:1320,cl:420,nota:"Libre disponible, sierra difícil",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Gómez Palacio",p:360000,v:7,lat:25.567,lng:-103.500,area:55,terrain:"Plana",security:"Moderada",comex:12,d:2335,cc:1248,cl:400,nota:"Conurbación con Torreón — libre disponible",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Lerdo",p:145000,v:7,lat:25.530,lng:-103.528,area:1185,terrain:"Plana",security:"Moderada",comex:6,d:2340,cc:1250,cl:400,nota:"Metro Torreón lado Durango — libre disponible",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}}
+  ]},
+  "Estado de México":{pob:"16.9M",gdp:"Medio",comex:"Muy Alta",mp:"Muy Alta",nivel:"alta",ciudades:[
+    {n:"Ecatepec",p:1677678,v:8,lat:19.601,lng:-99.060,area:190,terrain:"Plana",security:"Insegura",comex:45,d:1920,cc:1060,cl:362,nota:"Periferia CDMX — accesos con caseta",market:{activo:null,precio:"—",notas:"Zona popular, mercado masivo"}},
+    {n:"Nezahualcóyotl",p:1077208,v:7,lat:19.402,lng:-99.016,area:63,terrain:"Plana",security:"Insegura",comex:30,d:1910,cc:1055,cl:360,nota:"Periferia CDMX",market:{activo:null,precio:"—",notas:"Alta densidad de gente"}},
+    {n:"Toluca",p:873536,v:8,lat:19.292,lng:-99.654,area:110,terrain:"Poca pendiente",security:"Moderada",comex:30,d:1960,cc:1070,cl:365,nota:"Libre disponible vía Toluca",market:{activo:null,precio:"—",notas:"Capital estatal, buena oportunidad"}},
+    {n:"Naucalpan",p:833779,v:7,lat:19.476,lng:-99.238,area:150,terrain:"Accidentada",security:"Moderada",comex:25,d:1920,cc:1060,cl:362,nota:"Periferia CDMX",market:{activo:null,precio:"—",notas:"Zona mixta industrial-residencial"}},
+    {n:"Chimalhuacán",p:675615,v:6,lat:19.424,lng:-98.954,area:60,terrain:"Plana",security:"Insegura",comex:15,d:1910,cc:1055,cl:360,nota:"Periferia CDMX",market:{activo:null,precio:"—",notas:"Zona popular de bajos ingresos"}},
+    {n:"Tlalnepantla",p:664000,v:8,lat:19.536,lng:-99.194,area:85,terrain:"Plana",security:"Insegura",comex:35,d:1920,cc:1060,cl:362,nota:"Periferia norte CDMX",market:{activo:null,precio:"—",notas:"Zona industrial y comercial intensa"}},
+    {n:"Cuautitlán Izcalli",p:511000,v:7,lat:19.648,lng:-99.225,area:110,terrain:"Plana",security:"Moderada",comex:22,d:1930,cc:1065,cl:364,nota:"Periferia norte CDMX",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Ixtapaluca",p:467000,v:6,lat:19.318,lng:-98.876,area:70,terrain:"Poca pendiente",security:"Moderada",comex:15,d:1895,cc:1050,cl:358,nota:"Periferia oriente CDMX",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Nicolás Romero",p:366000,v:6,lat:19.633,lng:-99.307,area:65,terrain:"Accidentada",security:"Insegura",comex:10,d:1935,cc:1068,cl:365,nota:"Periferia noroeste CDMX",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Valle de Chalco",p:357000,v:5,lat:19.286,lng:-98.987,area:40,terrain:"Plana",security:"Insegura",comex:10,d:1900,cc:1050,cl:360,nota:"Periferia oriente CDMX",market:{activo:null,precio:"—",notas:"Zona popular densamente habitada"}},
+    {n:"Texcoco",p:235000,v:6,lat:19.514,lng:-98.884,area:45,terrain:"Poca pendiente",security:"Moderada",comex:10,d:1895,cc:1050,cl:358,nota:"Libre disponible — ciudad universitaria",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Tultitlán",p:525000,v:7,lat:19.648,lng:-99.172,area:72,terrain:"Plana",security:"Insegura",comex:18,d:1920,cc:1060,cl:362,nota:"Periferia norte CDMX — gran zona comercial",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Atizapán de Zaragoza",p:490000,v:7,lat:19.558,lng:-99.271,area:89,terrain:"Accidentada",security:"Moderada",comex:20,d:1925,cc:1062,cl:363,nota:"Periferia CDMX — zona residencial-comercial",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Tecámac",p:480000,v:7,lat:19.713,lng:-98.972,area:150,terrain:"Plana",security:"Moderada",comex:15,d:1910,cc:1055,cl:360,nota:"Periferia norte CDMX — municipio en expansión",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Chalco",p:380000,v:6,lat:19.261,lng:-98.901,area:55,terrain:"Plana",security:"Insegura",comex:12,d:1900,cc:1052,cl:359,nota:"Periferia sureste CDMX",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Coacalco",p:290000,v:7,lat:19.625,lng:-99.095,area:35,terrain:"Plana",security:"Insegura",comex:12,d:1920,cc:1058,cl:361,nota:"Periferia norte CDMX — muy denso",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Huixquilucan",p:280000,v:8,lat:19.366,lng:-99.349,area:143,terrain:"Muy accidentada",security:"Segura",comex:15,d:1915,cc:1057,cl:361,nota:"Periferia oeste CDMX — zona de alto poder adquisitivo",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"La Paz EdoMex",p:250000,v:6,lat:19.371,lng:-98.951,area:30,terrain:"Plana",security:"Insegura",comex:10,d:1900,cc:1052,cl:359,nota:"Periferia oriente CDMX — zona popular",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Metepec",p:227000,v:7,lat:19.259,lng:-99.601,area:72,terrain:"Poca pendiente",security:"Segura",comex:12,d:1960,cc:1070,cl:365,nota:"Conurbación Toluca — clase media-alta",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Zinacantepec",p:180000,v:5,lat:19.269,lng:-99.728,area:315,terrain:"Accidentada",security:"Moderada",comex:6,d:1965,cc:1072,cl:366,nota:"Libre disponible — sur de Toluca",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Almoloya de Juárez",p:175000,v:5,lat:19.371,lng:-99.826,area:430,terrain:"Accidentada",security:"Moderada",comex:5,d:1967,cc:1073,cl:366,nota:"Libre disponible — zona rural-urbana",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Lerma",p:150000,v:6,lat:19.280,lng:-99.817,area:228,terrain:"Plana",security:"Moderada",comex:6,d:1968,cc:1073,cl:366,nota:"Libre disponible — zona industrial",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}}
+  ]},
+  "Guanajuato":{pob:"6.2M",gdp:"Medio-Alto",comex:"Media",mp:"Alta",nivel:"alta",ciudades:[
+    {n:"León",p:1578626,v:9,lat:21.122,lng:-101.686,area:115,terrain:"Plana",security:"Moderada",comex:45,d:2200,cc:1180,cl:380,nota:"Libre disponible vía 45",market:{activo:null,precio:"—",notas:"Ciudad industrial grande, gran potencial"}},
+    {n:"Irapuato",p:607655,v:4,lat:20.674,lng:-101.355,area:70,terrain:"Plana",security:"Muy insegura",comex:18,d:2160,cc:1160,cl:375,nota:"Libre disponible",market:{activo:null,precio:"—",notas:"Alta violencia actualmente"}},
+    {n:"Celaya",p:534690,v:4,lat:20.524,lng:-100.814,area:80,terrain:"Plana",security:"Muy insegura",comex:15,d:2110,cc:1140,cl:368,nota:"Libre disponible",market:{activo:null,precio:"—",notas:"Alta violencia actualmente"}},
+    {n:"Salamanca",p:284344,v:5,lat:20.573,lng:-101.196,area:35,terrain:"Plana",security:"Insegura",comex:10,d:2175,cc:1165,cl:376,nota:"Libre disponible",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Silao",p:178000,v:5,lat:20.935,lng:-101.436,area:30,terrain:"Plana",security:"Moderada",comex:6,d:2185,cc:1170,cl:378,nota:"Libre disponible — zona automotriz",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"San Miguel de Allende",p:163000,v:6,lat:20.915,lng:-100.745,area:35,terrain:"Accidentada",security:"Segura",comex:6,d:2150,cc:1155,cl:373,nota:"Libre disponible — ciudad Patrimonio UNESCO",market:{activo:null,precio:"—",notas:"Turístico, clase media-alta y extranjeros"}},
+    {n:"Guanajuato",p:200000,v:6,lat:21.019,lng:-101.257,area:995,terrain:"Muy accidentada",security:"Segura",comex:8,d:2190,cc:1172,cl:379,nota:"Libre disponible — capital histórica UNESCO",market:{activo:null,precio:"—",notas:"Turístico, poder adquisitivo medio-alto"}},
+    {n:"Pénjamo",p:170000,v:5,lat:20.432,lng:-101.718,area:1840,terrain:"Plana",security:"Insegura",comex:6,d:2180,cc:1167,cl:377,nota:"Libre disponible — zona sur Guanajuato",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Valle de Santiago",p:140000,v:5,lat:20.394,lng:-101.184,area:800,terrain:"Plana",security:"Insegura",comex:5,d:2155,cc:1157,cl:374,nota:"Libre disponible",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Acámbaro",p:120000,v:5,lat:20.022,lng:-100.728,area:660,terrain:"Poca pendiente",security:"Moderada",comex:5,d:2095,cc:1127,cl:363,nota:"Libre disponible — sureste Guanajuato",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Cortazar",p:90000,v:5,lat:20.488,lng:-100.926,area:360,terrain:"Plana",security:"Insegura",comex:4,d:2130,cc:1145,cl:370,nota:"Libre disponible",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}}
+  ]},
+  "Guerrero":{pob:"3.5M",gdp:"Bajo",comex:"Baja",mp:"Baja",nivel:"baja",ciudades:[
+    {n:"Acapulco",p:789971,v:3,lat:16.853,lng:-99.823,area:140,terrain:"Accidentada",security:"Muy insegura",comex:25,d:2050,cc:1050,cl:0,nota:"Libre disponible vía costera — NO recomendado por inseguridad",market:{activo:null,precio:"—",notas:"No recomendado — muy inseguro"}},
+    {n:"Chilpancingo",p:323745,v:3,lat:17.551,lng:-99.500,area:45,terrain:"Accidentada",security:"Muy insegura",comex:10,d:1960,cc:1020,cl:0,nota:"No recomendado",market:{activo:null,precio:"—",notas:"No recomendado"}},
+    {n:"Iguala",p:141000,v:2,lat:18.346,lng:-99.538,area:30,terrain:"Accidentada",security:"Muy insegura",comex:6,d:1980,cc:1015,cl:0,nota:"No recomendado — zona de alto riesgo",market:{activo:null,precio:"—",notas:"No recomendado"}},
+    {n:"Zihuatanejo",p:128000,v:3,lat:17.644,lng:-101.551,area:30,terrain:"Poca pendiente",security:"Insegura",comex:5,d:2250,cc:1100,cl:0,nota:"Libre vía costera disponible — precaución",market:{activo:null,precio:"—",notas:"Zona turística pero precaución"}}
+  ]},
+  "Hidalgo":{pob:"3.1M",gdp:"Bajo-Medio",comex:"Baja",mp:"Media",nivel:"baja",ciudades:[
+    {n:"Pachuca",p:329879,v:5,lat:20.117,lng:-98.732,area:55,terrain:"Muy accidentada",security:"Moderada",comex:12,d:1940,cc:1050,cl:360,nota:"Libre disponible",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Tulancingo",p:166862,v:4,lat:20.085,lng:-98.361,area:25,terrain:"Poca pendiente",security:"Moderada",comex:6,d:1910,cc:1040,cl:355,nota:"Libre disponible",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Tula de Allende",p:96000,v:4,lat:20.053,lng:-99.345,area:20,terrain:"Poca pendiente",security:"Moderada",comex:4,d:1905,cc:1028,cl:332,nota:"Libre disponible — zona industrial",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Tizayuca",p:100000,v:5,lat:19.843,lng:-98.977,area:22,terrain:"Plana",security:"Moderada",comex:4,d:1920,cc:1035,cl:335,nota:"Libre disponible — municipio en expansión",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Ixmiquilpan",p:95000,v:4,lat:20.487,lng:-99.218,area:820,terrain:"Accidentada",security:"Moderada",comex:4,d:1930,cc:1043,cl:337,nota:"Libre disponible — Valle del Mezquital",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Huejutla",p:120000,v:4,lat:21.138,lng:-98.424,area:380,terrain:"Poca pendiente",security:"Moderada",comex:4,d:1840,cc:995,cl:322,nota:"Libre disponible — zona huasteca",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}}
+  ]},
+  "Jalisco":{pob:"8.3M",gdp:"Alto",comex:"Alta",mp:"Muy Alta",nivel:"alta",ciudades:[
+    {n:"Zapopan",p:1476491,v:9,lat:20.720,lng:-103.391,area:180,terrain:"Poca pendiente",security:"Segura",comex:40,d:2400,cc:1255,cl:402,nota:"Libre disponible vía 80",market:{activo:null,precio:"—",notas:"Zona premium, alto poder adquisitivo"}},
+    {n:"Guadalajara",p:1385629,v:9,lat:20.659,lng:-103.349,area:187,terrain:"Plana",security:"Moderada",comex:60,d:2390,cc:1250,cl:400,nota:"Libre disponible vía 80 o 15",market:{activo:null,precio:"—",notas:"2da ciudad del país, mercado enorme"}},
+    {n:"Tlaquepaque",p:742630,v:7,lat:20.642,lng:-103.313,area:50,terrain:"Plana",security:"Moderada",comex:20,d:2410,cc:1255,cl:402,nota:"Libre disponible",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Tonalá",p:563083,v:6,lat:20.624,lng:-103.234,area:40,terrain:"Plana",security:"Moderada",comex:15,d:2420,cc:1258,cl:403,nota:"Libre disponible",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Puerto Vallarta",p:287420,v:6,lat:20.653,lng:-105.225,area:68,terrain:"Accidentada",security:"Segura",comex:12,d:2550,cc:1300,cl:0,nota:"Libre vía 200 costera, sin casetas",market:{activo:null,precio:"—",notas:"Turístico, mercado especial"}},
+    {n:"Tlajomulco de Zúñiga",p:667000,v:8,lat:20.476,lng:-103.432,area:115,terrain:"Plana",security:"Moderada",comex:18,d:2420,cc:1260,cl:404,nota:"Libre disponible — municipio de crecimiento récord",market:{activo:null,precio:"—",notas:"El municipio de mayor crecimiento del país"}},
+    {n:"Lagos de Moreno",p:155000,v:5,lat:21.356,lng:-101.930,area:30,terrain:"Poca pendiente",security:"Moderada",comex:6,d:2270,cc:1215,cl:390,nota:"Libre disponible — Los Altos de Jalisco",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Ocotlán",p:100000,v:5,lat:20.358,lng:-102.772,area:22,terrain:"Plana",security:"Moderada",comex:5,d:2360,cc:1240,cl:398,nota:"Libre disponible — zona Ciénega",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"El Salto",p:170000,v:7,lat:20.519,lng:-103.202,area:65,terrain:"Poca pendiente",security:"Moderada",comex:6,d:2380,cc:1245,cl:400,nota:"Libre disponible — zona industrial sur Guadalajara",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Tepatitlán",p:130000,v:6,lat:20.818,lng:-102.748,area:1500,terrain:"Poca pendiente",security:"Segura",comex:5,d:2310,cc:1220,cl:392,nota:"Libre disponible — Los Altos, zona ganadera",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Ciudad Guzmán",p:100000,v:5,lat:19.706,lng:-103.467,area:330,terrain:"Plana",security:"Moderada",comex:5,d:2450,cc:1270,cl:408,nota:"Libre disponible — sur de Jalisco",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Zapotlanejo",p:85000,v:5,lat:20.628,lng:-103.069,area:600,terrain:"Poca pendiente",security:"Moderada",comex:3,d:2360,cc:1237,cl:397,nota:"Libre disponible",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"San Juan de los Lagos",p:70000,v:4,lat:21.242,lng:-102.323,area:225,terrain:"Poca pendiente",security:"Segura",comex:3,d:2270,cc:1215,cl:390,nota:"Libre disponible — pueblo de romería",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Ameca",p:70000,v:4,lat:20.549,lng:-104.047,area:1065,terrain:"Poca pendiente",security:"Moderada",comex:3,d:2470,cc:1278,cl:410,nota:"Libre disponible — zona valles",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}}
+  ]},
+  "Michoacán":{pob:"4.7M",gdp:"Bajo-Medio",comex:"Media",mp:"Media",nivel:"baja",ciudades:[
+    {n:"Morelia",p:849053,v:6,lat:19.703,lng:-101.192,area:145,terrain:"Poca pendiente",security:"Moderada",comex:25,d:2010,cc:1080,cl:350,nota:"Libre disponible vía 15",market:{activo:null,precio:"—",notas:"Capital, zona más segura del estado"}},
+    {n:"Uruapan",p:341985,v:3,lat:19.420,lng:-102.063,area:60,terrain:"Poca pendiente",security:"Muy insegura",comex:10,d:2110,cc:1100,cl:360,nota:"No recomendado por inseguridad",market:{activo:null,precio:"—",notas:"No recomendado"}},
+    {n:"Zamora",p:196620,v:3,lat:19.983,lng:-102.283,area:35,terrain:"Plana",security:"Muy insegura",comex:8,d:2150,cc:1110,cl:365,nota:"No recomendado",market:{activo:null,precio:"—",notas:"No recomendado"}},
+    {n:"Lázaro Cárdenas",p:178000,v:2,lat:17.958,lng:-102.200,area:40,terrain:"Poca pendiente",security:"Muy insegura",comex:6,d:2300,cc:1150,cl:380,nota:"Puerto industrial — NO recomendado por inseguridad",market:{activo:null,precio:"—",notas:"No recomendado — zona de alto riesgo"}},
+    {n:"Zitácuaro",p:155000,v:4,lat:19.433,lng:-100.356,area:840,terrain:"Accidentada",security:"Insegura",comex:6,d:1990,cc:1070,cl:345,nota:"Libre disponible — zona mariposa monarca",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"La Piedad",p:90000,v:4,lat:20.345,lng:-102.033,area:200,terrain:"Plana",security:"Moderada",comex:4,d:2120,cc:1140,cl:368,nota:"Libre disponible — zona Ciénega",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Sahuayo",p:80000,v:4,lat:20.054,lng:-102.722,area:85,terrain:"Poca pendiente",security:"Moderada",comex:4,d:2130,cc:1145,cl:370,nota:"Libre disponible",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Apatzingán",p:105000,v:2,lat:19.090,lng:-102.352,area:1590,terrain:"Plana",security:"Muy insegura",comex:5,d:2150,cc:1105,cl:360,nota:"No recomendado por inseguridad",market:{activo:null,precio:"—",notas:"No recomendado"}}
+  ]},
+  "Morelos":{pob:"2.0M",gdp:"Medio",comex:"Media",mp:"Alta",nivel:"media",ciudades:[
+    {n:"Cuernavaca",p:385176,v:6,lat:18.924,lng:-99.234,area:150,terrain:"Accidentada",security:"Moderada",comex:15,d:1860,cc:1000,cl:330,nota:"Libre disponible, agrega ~1.5h",market:{activo:null,precio:"—",notas:"Ciudad de retiro, clase media-alta"}},
+    {n:"Jiutepec",p:222255,v:5,lat:18.886,lng:-99.175,area:26,terrain:"Poca pendiente",security:"Moderada",comex:8,d:1865,cc:1005,cl:332,nota:"Libre disponible",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Cuautla",p:191000,v:5,lat:18.815,lng:-98.941,area:50,terrain:"Poca pendiente",security:"Moderada",comex:8,d:1810,cc:980,cl:315,nota:"Libre disponible — zona oriente Morelos",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Temixco",p:126000,v:5,lat:18.847,lng:-99.234,area:28,terrain:"Poca pendiente",security:"Moderada",comex:6,d:1860,cc:1000,cl:330,nota:"Libre disponible — conurbación Cuernavaca",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}}
+  ]},
+  "Nayarit":{pob:"1.2M",gdp:"Bajo-Medio",comex:"Baja",mp:"Baja",nivel:"baja",ciudades:[
+    {n:"Tepic",p:415730,v:5,lat:21.503,lng:-104.894,area:90,terrain:"Accidentada",security:"Insegura",comex:12,d:2600,cc:1350,cl:420,nota:"Libre disponible, sierra difícil",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Bahía de Banderas",p:153639,v:5,lat:20.754,lng:-105.233,area:100,terrain:"Poca pendiente",security:"Segura",comex:6,d:2555,cc:1320,cl:410,nota:"Libre disponible vía 200",market:{activo:null,precio:"—",notas:"Zona turística, mercado vacacional"}}
+  ]},
+  "Nuevo León":{pob:"5.8M",gdp:"Muy Alto",comex:"Alta",mp:"Muy Alta",nivel:"alta",ciudades:[
+    {n:"Monterrey",p:1142994,v:9,lat:25.686,lng:-100.316,area:330,terrain:"Plana",security:"Segura",comex:60,d:2050,cc:1100,cl:355,nota:"Libre disponible vía 85",market:{activo:null,precio:"—",notas:"3ra ciudad, economía muy alta"}},
+    {n:"Guadalupe NL",p:789571,v:8,lat:25.679,lng:-100.259,area:125,terrain:"Plana",security:"Moderada",comex:25,d:2060,cc:1105,cl:357,nota:"Periferia Monterrey",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Apodaca",p:658080,v:8,lat:25.781,lng:-100.188,area:130,terrain:"Plana",security:"Segura",comex:20,d:2055,cc:1102,cl:356,nota:"Periferia Monterrey",market:{activo:null,precio:"—",notas:"Zona industrial fuerte"}},
+    {n:"San Nicolás",p:496176,v:8,lat:25.737,lng:-100.303,area:60,terrain:"Plana",security:"Segura",comex:20,d:2055,cc:1102,cl:356,nota:"Periferia Monterrey",market:{activo:null,precio:"—",notas:"Clase media-alta"}},
+    {n:"Gral. Escobedo",p:424275,v:7,lat:25.797,lng:-100.329,area:100,terrain:"Plana",security:"Segura",comex:12,d:2060,cc:1105,cl:357,nota:"Periferia Monterrey",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Juárez NL",p:284000,v:7,lat:25.649,lng:-100.099,area:90,terrain:"Plana",security:"Moderada",comex:10,d:2070,cc:1110,cl:358,nota:"Periferia oriente Monterrey",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Santa Catarina",p:268000,v:7,lat:25.674,lng:-100.462,area:70,terrain:"Accidentada",security:"Moderada",comex:10,d:2060,cc:1105,cl:357,nota:"Periferia poniente Monterrey",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"San Pedro Garza García",p:123000,v:9,lat:25.651,lng:-100.403,area:68,terrain:"Accidentada",security:"Muy segura",comex:20,d:2060,cc:1105,cl:357,nota:"Municipio más adinerado de México",market:{activo:null,precio:"—",notas:"Mercado premium — precio puede subir"}},
+    {n:"García NL",p:280000,v:7,lat:25.799,lng:-100.602,area:1500,terrain:"Plana",security:"Moderada",comex:10,d:2070,cc:1110,cl:358,nota:"Periferia poniente Monterrey — crecimiento récord",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Linares",p:90000,v:5,lat:24.861,lng:-99.570,area:2580,terrain:"Poca pendiente",security:"Moderada",comex:4,d:1980,cc:1070,cl:345,nota:"Libre disponible — sur Nuevo León",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Montemorelos",p:60000,v:4,lat:25.191,lng:-99.827,area:1745,terrain:"Poca pendiente",security:"Segura",comex:3,d:1960,cc:1060,cl:343,nota:"Libre disponible — pueblo citrícola",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}}
+  ]},
+  "Oaxaca":{pob:"4.1M",gdp:"Bajo",comex:"Baja",mp:"Baja",nivel:"baja",ciudades:[
+    {n:"Oaxaca de Juárez",p:318219,v:5,lat:17.073,lng:-96.723,area:90,terrain:"Poca pendiente",security:"Segura",comex:12,d:1720,cc:780,cl:0,nota:"Libre disponible vía 190, sin casetas pero montañosa",market:{activo:null,precio:"—",notas:"Turístico pero poder adquisitivo bajo"}},
+    {n:"Tuxtepec",p:155029,v:4,lat:18.092,lng:-96.122,area:40,terrain:"Plana",security:"Moderada",comex:6,d:1240,cc:540,cl:150,nota:"Libre disponible",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Salina Cruz",p:97115,v:3,lat:16.172,lng:-95.200,area:35,terrain:"Plana",security:"Moderada",comex:4,d:1650,cc:720,cl:0,nota:"Libre disponible vía istmo",market:{activo:null,precio:"—",notas:"Ciudad pequeña"}},
+    {n:"Juchitán",p:95000,v:3,lat:16.433,lng:-95.017,area:25,terrain:"Plana",security:"Moderada",comex:4,d:1520,cc:680,cl:0,nota:"Libre disponible vía istmo",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Puerto Escondido",p:50000,v:3,lat:15.862,lng:-97.065,area:20,terrain:"Accidentada",security:"Moderada",comex:3,d:1780,cc:800,cl:0,nota:"Ruta costera — pueblo turístico",market:{activo:null,precio:"—",notas:"Turístico, poder adquisitivo variado"}},
+    {n:"Huatulco",p:45000,v:3,lat:15.765,lng:-96.141,area:580,terrain:"Accidentada",security:"Moderada",comex:2,d:1610,cc:722,cl:0,nota:"Libre disponible vía costera — zona turística",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Pinotepa Nacional",p:50000,v:3,lat:16.345,lng:-98.055,area:490,terrain:"Poca pendiente",security:"Moderada",comex:2,d:1780,cc:800,cl:0,nota:"Libre disponible — zona costera",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}}
+  ]},
+  "Puebla":{pob:"6.6M",gdp:"Medio",comex:"Alta",mp:"Alta",nivel:"media",ciudades:[
+    {n:"Puebla",p:1692181,v:8,lat:19.043,lng:-98.198,area:535,terrain:"Poca pendiente",security:"Moderada",comex:55,d:1800,cc:870,cl:280,nota:"Libre disponible vía 190, agrega +2h",market:{activo:null,precio:"—",notas:"4ta ciudad del país, gran mercado"}},
+    {n:"Tehuacán",p:338810,v:6,lat:18.463,lng:-97.393,area:45,terrain:"Poca pendiente",security:"Moderada",comex:12,d:1660,cc:800,cl:250,nota:"Libre disponible",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"San Martín Texmelucan",p:155351,v:5,lat:19.280,lng:-98.434,area:30,terrain:"Poca pendiente",security:"Moderada",comex:6,d:1780,cc:860,cl:275,nota:"Libre disponible",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"San Andrés Cholula",p:140000,v:6,lat:19.062,lng:-98.309,area:28,terrain:"Poca pendiente",security:"Moderada",comex:6,d:1800,cc:870,cl:280,nota:"Conurbación Puebla — zona universitaria",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Atlixco",p:100000,v:5,lat:18.907,lng:-98.437,area:20,terrain:"Poca pendiente",security:"Moderada",comex:5,d:1820,cc:880,cl:285,nota:"Libre disponible — sur de Puebla",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Amozoc",p:130000,v:5,lat:19.051,lng:-97.974,area:150,terrain:"Poca pendiente",security:"Moderada",comex:5,d:1790,cc:865,cl:278,nota:"Libre disponible — periferia oriente Puebla",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Cuautlancingo",p:85000,v:6,lat:19.079,lng:-98.269,area:42,terrain:"Poca pendiente",security:"Moderada",comex:4,d:1800,cc:870,cl:280,nota:"Conurbación Puebla — zona industrial",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Teziutlán",p:95000,v:5,lat:19.822,lng:-97.356,area:80,terrain:"Muy accidentada",security:"Moderada",comex:4,d:1680,cc:810,cl:260,nota:"Libre disponible — zona montaña norte Puebla",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Huauchinango",p:90000,v:5,lat:20.176,lng:-98.054,area:267,terrain:"Muy accidentada",security:"Moderada",comex:3,d:1730,cc:835,cl:268,nota:"Libre disponible — sierra norte",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Izúcar de Matamoros",p:80000,v:4,lat:18.600,lng:-98.467,area:395,terrain:"Plana",security:"Moderada",comex:4,d:1790,cc:865,cl:278,nota:"Libre disponible — zona mixteca",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}}
+  ]},
+  "Querétaro":{pob:"2.4M",gdp:"Muy Alto",comex:"Media",mp:"Alta",nivel:"alta",ciudades:[
+    {n:"Querétaro",p:1097025,v:9,lat:20.588,lng:-100.389,area:200,terrain:"Poca pendiente",security:"Muy segura",comex:35,d:2080,cc:1120,cl:360,nota:"Libre disponible vía 45",market:{activo:null,precio:"—",notas:"Ciudad con mayor crecimiento en México"}},
+    {n:"El Marqués",p:317309,v:7,lat:20.616,lng:-100.227,area:110,terrain:"Plana",security:"Segura",comex:8,d:2090,cc:1125,cl:362,nota:"Libre disponible",market:{activo:null,precio:"—",notas:"Zona industrial en expansión"}},
+    {n:"San Juan del Río",p:262000,v:7,lat:20.387,lng:-100.001,area:60,terrain:"Poca pendiente",security:"Moderada",comex:8,d:2050,cc:1100,cl:355,nota:"Libre disponible — entrada a Querétaro",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Corregidora",p:168000,v:7,lat:20.550,lng:-100.442,area:50,terrain:"Plana",security:"Segura",comex:6,d:2085,cc:1123,cl:362,nota:"Libre disponible — conurbación Querétaro",market:{activo:null,precio:"—",notas:"Zona residencial en crecimiento"}},
+    {n:"Tequisquiapan",p:65000,v:5,lat:20.521,lng:-99.887,area:337,terrain:"Plana",security:"Muy segura",comex:3,d:2060,cc:1107,cl:357,nota:"Libre disponible — pueblo mágico, turístico",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}}
+  ]},
+  "Quintana Roo":{pob:"1.9M",gdp:"Alto",comex:"Media",mp:"Alta",nivel:"alta",ciudades:[
+    {n:"Cancún",p:888797,v:7,lat:21.161,lng:-86.851,area:150,terrain:"Plana",security:"Moderada",comex:25,d:0,cc:0,cl:0,nota:"",market:{activo:true,precio:"$650",notas:"Confirmado: ya hay vendedores en FB a $650"}},
+    {n:"Playa del Carmen",p:308440,v:6,lat:20.630,lng:-87.079,area:40,terrain:"Plana",security:"Moderada",comex:10,d:68,cc:35,cl:0,nota:"Libre disponible, casi mismo tiempo",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Chetumal",p:167614,v:5,lat:18.500,lng:-88.296,area:35,terrain:"Plana",security:"Segura",comex:8,d:380,cc:120,cl:0,nota:"Libre disponible vía 307, sin casetas",market:{activo:false,precio:"—",notas:"Sin competidores — posible oportunidad"}},
+    {n:"Tulum",p:35000,v:5,lat:20.212,lng:-87.465,area:20,terrain:"Plana",security:"Moderada",comex:4,d:130,cc:40,cl:0,nota:"Libre disponible — turístico en auge",market:{activo:null,precio:"—",notas:"Mercado turístico en fuerte crecimiento"}},
+    {n:"Cozumel",p:80000,v:4,lat:20.423,lng:-86.922,area:30,terrain:"Plana",security:"Segura",comex:5,d:100,cc:0,cl:0,nota:"Requiere ferry desde Playa del Carmen",market:{activo:null,precio:"—",notas:"Isla turística — logística especial"}},
+    {n:"Bacalar",p:13000,v:3,lat:18.676,lng:-88.393,area:15,terrain:"Plana",security:"Segura",comex:2,d:320,cc:95,cl:0,nota:"Libre disponible — pueblo mágico",market:{activo:null,precio:"—",notas:"Turístico, mercado pequeño"}}
+  ]},
+  "San Luis Potosí":{pob:"2.8M",gdp:"Medio",comex:"Media",mp:"Media",nivel:"media",ciudades:[
+    {n:"San Luis Potosí",p:824229,v:7,lat:22.152,lng:-100.979,area:80,terrain:"Poca pendiente",security:"Segura",comex:30,d:2050,cc:1100,cl:355,nota:"Libre disponible vía 70",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Soledad de G.",p:316019,v:6,lat:22.184,lng:-100.939,area:30,terrain:"Plana",security:"Moderada",comex:10,d:2055,cc:1102,cl:356,nota:"Periferia SLP",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Ciudad Valles",p:168000,v:5,lat:21.997,lng:-99.018,area:35,terrain:"Poca pendiente",security:"Moderada",comex:6,d:1820,cc:980,cl:315,nota:"Libre disponible — zona huasteca",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Matehuala",p:97000,v:4,lat:23.648,lng:-100.640,area:20,terrain:"Poca pendiente",security:"Moderada",comex:4,d:2010,cc:1080,cl:348,nota:"Libre disponible — ciudad pequeña en ruta norte",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Rioverde",p:82000,v:4,lat:21.931,lng:-99.983,area:1185,terrain:"Poca pendiente",security:"Moderada",comex:3,d:1950,cc:1050,cl:340,nota:"Libre disponible — zona media SLP",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Ciudad Fernández",p:75000,v:4,lat:22.161,lng:-100.035,area:660,terrain:"Poca pendiente",security:"Moderada",comex:3,d:1955,cc:1053,cl:341,nota:"Libre disponible",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Tamazunchale",p:55000,v:3,lat:21.260,lng:-98.784,area:165,terrain:"Muy accidentada",security:"Moderada",comex:2,d:1760,cc:952,cl:308,nota:"Libre disponible — zona huasteca, montañoso",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}}
+  ]},
+  "Sinaloa":{pob:"3.0M",gdp:"Medio",comex:"Media",mp:"Media",nivel:"media",ciudades:[
+    {n:"Culiacán",p:1003530,v:4,lat:24.809,lng:-107.393,area:200,terrain:"Plana",security:"Muy insegura",comex:30,d:3050,cc:1800,cl:550,nota:"No recomendado por inseguridad",market:{activo:null,precio:"—",notas:"No recomendado por inseguridad"}},
+    {n:"Mazatlán",p:502547,v:6,lat:23.249,lng:-106.411,area:80,terrain:"Poca pendiente",security:"Moderada",comex:18,d:2730,cc:1620,cl:500,nota:"Libre disponible vía 15",market:{activo:null,precio:"—",notas:"Turístico, mercado activo"}},
+    {n:"Los Mochis",p:310126,v:5,lat:25.793,lng:-108.987,area:55,terrain:"Plana",security:"Insegura",comex:12,d:3160,cc:1900,cl:580,nota:"Libre disponible, distancia extrema",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Guasave",p:95000,v:3,lat:25.566,lng:-108.472,area:20,terrain:"Plana",security:"Insegura",comex:4,d:3060,cc:1820,cl:558,nota:"Distancia extrema — precaución",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Navolato",p:140000,v:4,lat:24.765,lng:-107.701,area:3020,terrain:"Plana",security:"Insegura",comex:4,d:2980,cc:1773,cl:542,nota:"Libre disponible — conurbación agrícola Culiacán",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Guamúchil",p:80000,v:4,lat:25.461,lng:-108.081,area:1450,terrain:"Plana",security:"Insegura",comex:3,d:3040,cc:1810,cl:554,nota:"Libre disponible — zona agrícola",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}}
+  ]},
+  "Sonora":{pob:"3.0M",gdp:"Alto",comex:"Media",mp:"Alta",nivel:"alta",ciudades:[
+    {n:"Hermosillo",p:936263,v:8,lat:29.073,lng:-110.955,area:180,terrain:"Plana",security:"Moderada",comex:30,d:3520,cc:2050,cl:630,nota:"Distancia extrema — considerar vuelo",market:{activo:null,precio:"—",notas:"Capital fuerte, gran oportunidad"}},
+    {n:"Cajeme (Cd. Obregón)",p:494002,v:6,lat:27.485,lng:-109.942,area:75,terrain:"Plana",security:"Insegura",comex:15,d:3310,cc:1950,cl:600,nota:"Distancia extrema",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Nogales",p:264462,v:5,lat:31.315,lng:-110.944,area:35,terrain:"Accidentada",security:"Insegura",comex:8,d:3840,cc:2200,cl:680,nota:"Distancia extrema",market:{activo:null,precio:"—",notas:"Frontera, mercado inestable"}},
+    {n:"Navojoa",p:160000,v:4,lat:27.072,lng:-109.444,area:35,terrain:"Plana",security:"Insegura",comex:6,d:3380,cc:2000,cl:615,nota:"Distancia extrema — precaución",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Guaymas",p:120000,v:5,lat:27.920,lng:-110.905,area:30,terrain:"Poca pendiente",security:"Moderada",comex:5,d:3570,cc:2080,cl:640,nota:"Distancia extrema — puerto pesquero",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"San Luis Río Colorado",p:180000,v:5,lat:32.453,lng:-114.776,area:45,terrain:"Plana",security:"Moderada",comex:8,d:4150,cc:2450,cl:750,nota:"Distancia extrema — frontera",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Agua Prieta",p:85000,v:4,lat:31.326,lng:-109.549,area:1700,terrain:"Plana",security:"Insegura",comex:4,d:3900,cc:2260,cl:696,nota:"Distancia extrema — ciudad fronteriza",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Caborca",p:80000,v:4,lat:30.715,lng:-112.145,area:6320,terrain:"Plana",security:"Moderada",comex:3,d:3950,cc:2290,cl:705,nota:"Distancia extrema",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Puerto Peñasco",p:65000,v:4,lat:31.300,lng:-113.544,area:2440,terrain:"Plana",security:"Segura",comex:3,d:4100,cc:2390,cl:735,nota:"Distancia extrema — turístico de playa",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}}
+  ]},
+  "Tabasco":{pob:"2.4M",gdp:"Medio",comex:"Baja",mp:"Media",nivel:"media",ciudades:[
+    {n:"Villahermosa",p:400718,v:6,lat:17.989,lng:-92.930,area:65,terrain:"Plana",security:"Moderada",comex:15,d:890,cc:380,cl:130,nota:"Libre posible vía 186, casetas obligatorias en puentes",market:{activo:null,precio:"—",notas:"Capital petrolera, poder adquisitivo medio"}},
+    {n:"Cárdenas",p:186158,v:4,lat:18.002,lng:-93.371,area:30,terrain:"Plana",security:"Moderada",comex:6,d:975,cc:400,cl:140,nota:"Libre disponible",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Comalcalco",p:97000,v:4,lat:18.277,lng:-93.215,area:25,terrain:"Plana",security:"Moderada",comex:4,d:1010,cc:440,cl:148,nota:"Libre disponible — zona cacao",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Paraíso",p:95000,v:4,lat:18.397,lng:-93.218,area:25,terrain:"Plana",security:"Moderada",comex:3,d:1020,cc:445,cl:150,nota:"Libre disponible — ciudad costera",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Huimanguillo",p:150000,v:4,lat:17.835,lng:-93.397,area:2450,terrain:"Plana",security:"Moderada",comex:5,d:1000,cc:437,cl:145,nota:"Libre disponible — zona petrolera",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Macuspana",p:61000,v:3,lat:17.769,lng:-92.543,area:3450,terrain:"Plana",security:"Moderada",comex:2,d:920,cc:390,cl:130,nota:"Libre disponible — ciudad pequeña",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}}
+  ]},
+  "Tamaulipas":{pob:"3.6M",gdp:"Medio-Alto",comex:"Media",mp:"Alta",nivel:"alta",ciudades:[
+    {n:"Reynosa",p:704767,v:5,lat:26.083,lng:-98.291,area:100,terrain:"Plana",security:"Muy insegura",comex:22,d:2120,cc:1140,cl:365,nota:"No recomendado — frontera peligrosa",market:{activo:null,precio:"—",notas:"Frontera peligrosa, no recomendado"}},
+    {n:"Matamoros",p:520367,v:5,lat:25.869,lng:-97.504,area:80,terrain:"Plana",security:"Muy insegura",comex:18,d:2240,cc:1190,cl:382,nota:"No recomendado",market:{activo:null,precio:"—",notas:"No recomendado"}},
+    {n:"Cd. Victoria",p:355838,v:6,lat:23.737,lng:-99.146,area:60,terrain:"Poca pendiente",security:"Moderada",comex:12,d:1920,cc:1040,cl:335,nota:"Libre disponible vía 85",market:{activo:null,precio:"—",notas:"Capital, más estable"}},
+    {n:"Tampico",p:306077,v:6,lat:22.253,lng:-97.866,area:55,terrain:"Plana",security:"Moderada",comex:15,d:1760,cc:950,cl:305,nota:"Libre disponible",market:{activo:null,precio:"—",notas:"Puerto industrial, poder adquisitivo medio"}},
+    {n:"Nuevo Laredo",p:420000,v:3,lat:27.477,lng:-99.514,area:80,terrain:"Plana",security:"Muy insegura",comex:15,d:2120,cc:1140,cl:365,nota:"NO recomendado — frontera peligrosa",market:{activo:null,precio:"—",notas:"No recomendado"}},
+    {n:"Altamira",p:220000,v:5,lat:22.397,lng:-97.928,area:40,terrain:"Plana",security:"Moderada",comex:8,d:1740,cc:940,cl:300,nota:"Libre disponible — zona industrial portuaria",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Río Bravo",p:130000,v:4,lat:25.992,lng:-98.091,area:1680,terrain:"Plana",security:"Muy insegura",comex:5,d:2130,cc:1148,cl:368,nota:"No recomendado — zona fronteriza peligrosa",market:{activo:null,precio:"—",notas:"No recomendado"}},
+    {n:"Valle Hermoso",p:65000,v:4,lat:25.673,lng:-97.818,area:1170,terrain:"Plana",security:"Muy insegura",comex:3,d:2215,cc:1188,cl:382,nota:"No recomendado — zona fronteriza",market:{activo:null,precio:"—",notas:"No recomendado"}},
+    {n:"San Fernando",p:55000,v:4,lat:24.844,lng:-98.147,area:5880,terrain:"Plana",security:"Muy insegura",comex:2,d:2020,cc:1090,cl:352,nota:"No recomendado — carretera peligrosa",market:{activo:null,precio:"—",notas:"No recomendado"}}
+  ]},
+  "Tlaxcala":{pob:"1.3M",gdp:"Bajo-Medio",comex:"Baja",mp:"Media",nivel:"baja",ciudades:[
+    {n:"Apizaco",p:106928,v:4,lat:19.417,lng:-98.133,area:15,terrain:"Poca pendiente",security:"Moderada",comex:4,d:1845,cc:990,cl:325,nota:"Libre disponible",market:{activo:null,precio:"—",notas:"Ciudad pequeña"}},
+    {n:"Tlaxcala",p:101268,v:4,lat:19.313,lng:-98.239,area:20,terrain:"Poca pendiente",security:"Segura",comex:4,d:1855,cc:995,cl:328,nota:"Libre disponible",market:{activo:null,precio:"—",notas:"Ciudad pequeña"}},
+    {n:"Huamantla",p:53000,v:3,lat:19.315,lng:-97.921,area:15,terrain:"Poca pendiente",security:"Moderada",comex:3,d:1860,cc:1000,cl:330,nota:"Libre disponible — pueblo mágico",market:{activo:null,precio:"—",notas:"Pueblo grande, mercado reducido"}},
+    {n:"Santa Ana Chiautempan",p:57000,v:3,lat:19.317,lng:-98.191,area:12,terrain:"Poca pendiente",security:"Moderada",comex:2,d:1845,cc:993,cl:327,nota:"Libre disponible — industria textil",market:{activo:null,precio:"—",notas:"Ciudad pequeña"}},
+    {n:"Calpulalpan",p:70000,v:4,lat:19.590,lng:-98.571,area:200,terrain:"Poca pendiente",security:"Moderada",comex:3,d:1845,cc:992,cl:327,nota:"Libre disponible — zona limítrofe con EdoMex",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}}
+  ]},
+  "Veracruz":{pob:"8.1M",gdp:"Medio",comex:"Media",mp:"Alta",nivel:"media",ciudades:[
+    {n:"Veracruz",p:607086,v:8,lat:19.181,lng:-96.142,area:240,terrain:"Plana",security:"Moderada",comex:25,d:1400,cc:650,cl:220,nota:"Libre vía 180 disponible, agrega ~2.5h. Casetas obligatorias al llegar al puerto.",market:{activo:false,precio:"—",notas:"Confirmado: sin vendedores en FB — oportunidad abierta"}},
+    {n:"Xalapa",p:480841,v:7,lat:19.543,lng:-96.927,area:118,terrain:"Muy accidentada",security:"Segura",comex:20,d:1460,cc:680,cl:230,nota:"Libre vía 180+140 disponible, montañosa en el tramo final",market:{activo:null,precio:"—",notas:"Capital universitaria, mercado activo"}},
+    {n:"Coatzacoalcos",p:305225,v:5,lat:18.141,lng:-94.453,area:80,terrain:"Plana",security:"Insegura",comex:12,d:1050,cc:480,cl:160,nota:"Libre disponible con algunas casetas de puente",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Córdoba",p:220851,v:5,lat:18.883,lng:-96.931,area:55,terrain:"Poca pendiente",security:"Moderada",comex:10,d:1430,cc:660,cl:225,nota:"Libre disponible vía 150",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Orizaba",p:130000,v:5,lat:18.850,lng:-97.100,area:28,terrain:"Muy accidentada",security:"Moderada",comex:8,d:1450,cc:670,cl:228,nota:"Libre disponible vía 150 — ciudad industrial en montaña",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Poza Rica",p:193649,v:5,lat:20.533,lng:-97.457,area:55,terrain:"Poca pendiente",security:"Insegura",comex:8,d:1580,cc:720,cl:250,nota:"Libre disponible",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Minatitlán",p:157000,v:4,lat:17.991,lng:-94.552,area:45,terrain:"Plana",security:"Insegura",comex:8,d:1040,cc:475,cl:155,nota:"Libre disponible — zona petrolera",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Boca del Río",p:135000,v:6,lat:19.108,lng:-96.115,area:32,terrain:"Plana",security:"Moderada",comex:10,d:1400,cc:650,cl:220,nota:"Conurbación con Veracruz puerto",market:{activo:null,precio:"—",notas:"Zona residencial-turística, buena oportunidad"}},
+    {n:"Tuxpan",p:116000,v:5,lat:20.958,lng:-97.398,area:30,terrain:"Poca pendiente",security:"Moderada",comex:6,d:1590,cc:730,cl:255,nota:"Libre disponible — norte del estado",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Coatepec",p:83000,v:4,lat:19.452,lng:-96.962,area:22,terrain:"Accidentada",security:"Segura",comex:4,d:1460,cc:682,cl:230,nota:"Libre disponible — ciudad del café, cerca de Xalapa",market:{activo:null,precio:"—",notas:"Ciudad pequeña, pueblo mágico"}},
+    {n:"San Andrés Tuxtla",p:160000,v:5,lat:18.449,lng:-95.213,area:900,terrain:"Accidentada",security:"Moderada",comex:6,d:1180,cc:520,cl:170,nota:"Libre disponible — Los Tuxtlas",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Tierra Blanca",p:110000,v:5,lat:18.447,lng:-96.357,area:1750,terrain:"Plana",security:"Moderada",comex:4,d:1260,cc:560,cl:185,nota:"Libre disponible — zona cañera",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Papantla",p:100000,v:4,lat:20.442,lng:-97.321,area:1310,terrain:"Accidentada",security:"Moderada",comex:4,d:1610,cc:738,cl:256,nota:"Libre disponible — zona del Totonacapan",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Acayucan",p:100000,v:4,lat:17.951,lng:-94.915,area:840,terrain:"Plana",security:"Moderada",comex:4,d:1100,cc:495,cl:163,nota:"Libre disponible — zona sur Veracruz",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Martínez de la Torre",p:80000,v:4,lat:20.066,lng:-97.052,area:485,terrain:"Poca pendiente",security:"Moderada",comex:3,d:1570,cc:720,cl:250,nota:"Libre disponible — zona citrícola",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Cosamaloapan",p:75000,v:4,lat:18.365,lng:-95.801,area:625,terrain:"Plana",security:"Moderada",comex:3,d:1200,cc:535,cl:177,nota:"Libre disponible — ribera del Papaloapan",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Álamo Temapache",p:85000,v:4,lat:20.916,lng:-97.678,area:1550,terrain:"Poca pendiente",security:"Insegura",comex:3,d:1600,cc:734,cl:254,nota:"Libre disponible — zona petrolera norte",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}}
+  ]},
+  "Yucatán":{pob:"2.3M",gdp:"Medio-Alto",comex:"Media",mp:"Alta",nivel:"alta",ciudades:[
+    {n:"Mérida",p:892363,v:8,lat:20.967,lng:-89.623,area:280,terrain:"Plana",security:"Muy segura",comex:35,d:320,cc:75,cl:0,nota:"Libre vía 180 sin casetas, agrega ~40 min",market:{activo:null,precio:"—",notas:"Ciudad de crecimiento acelerado, gran oportunidad"}},
+    {n:"Kanasín",p:142000,v:6,lat:20.937,lng:-89.559,area:40,terrain:"Plana",security:"Segura",comex:10,d:325,cc:78,cl:0,nota:"Libre disponible — suburbio oriente de Mérida",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Valladolid",p:95432,v:4,lat:20.689,lng:-88.202,area:35,terrain:"Plana",security:"Muy segura",comex:4,d:160,cc:40,cl:0,nota:"Libre disponible, casi mismo tiempo",market:{activo:null,precio:"—",notas:"Ciudad pequeña"}},
+    {n:"Progreso",p:62000,v:4,lat:21.281,lng:-89.664,area:18,terrain:"Plana",security:"Muy segura",comex:5,d:365,cc:88,cl:0,nota:"Puerto — libre disponible sin casetas",market:{activo:null,precio:"—",notas:"Puerto de cruceros, mercado estacional"}},
+    {n:"Tizimín",p:52000,v:3,lat:20.971,lng:-88.166,area:20,terrain:"Plana",security:"Muy segura",comex:3,d:225,cc:55,cl:0,nota:"Libre disponible — pueblo ganadero",market:{activo:null,precio:"—",notas:"Pueblo grande — sin datos verificar en FB"}},
+    {n:"Umán",p:50000,v:4,lat:20.890,lng:-89.765,area:20,terrain:"Plana",security:"Segura",comex:3,d:345,cc:82,cl:0,nota:"Libre disponible — suburbio sur de Mérida",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Ticul",p:40000,v:3,lat:20.397,lng:-89.523,area:205,terrain:"Plana",security:"Muy segura",comex:2,d:390,cc:93,cl:0,nota:"Libre disponible — pueblo mágico zapatero",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Tekax",p:40000,v:3,lat:20.202,lng:-89.274,area:2930,terrain:"Plana",security:"Muy segura",comex:2,d:400,cc:95,cl:0,nota:"Libre disponible — sur Yucatán",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Izamal",p:26000,v:3,lat:20.930,lng:-89.020,area:238,terrain:"Plana",security:"Muy segura",comex:2,d:285,cc:68,cl:0,nota:"Libre disponible — pueblo mágico entre Mérida y Valladolid",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}}
+  ]},
+  "Zacatecas":{pob:"1.6M",gdp:"Bajo",comex:"Baja",mp:"Baja",nivel:"baja",ciudades:[
+    {n:"Fresnillo",p:226685,v:3,lat:23.175,lng:-102.877,area:35,terrain:"Poca pendiente",security:"Muy insegura",comex:8,d:2380,cc:1270,cl:405,nota:"No recomendado por inseguridad",market:{activo:null,precio:"—",notas:"No recomendado"}},
+    {n:"Guadalupe Zac.",p:179410,v:4,lat:22.745,lng:-102.509,area:30,terrain:"Poca pendiente",security:"Moderada",comex:6,d:2340,cc:1255,cl:400,nota:"Libre disponible",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Zacatecas",p:138176,v:4,lat:22.770,lng:-102.583,area:35,terrain:"Muy accidentada",security:"Moderada",comex:8,d:2330,cc:1250,cl:399,nota:"Libre disponible, ciudad histórica",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Río Grande",p:70000,v:4,lat:23.809,lng:-103.036,area:7030,terrain:"Poca pendiente",security:"Insegura",comex:3,d:2410,cc:1285,cl:410,nota:"Libre disponible — norte Zacatecas",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}},
+    {n:"Jerez",p:60000,v:4,lat:22.648,lng:-103.002,area:1530,terrain:"Accidentada",security:"Moderada",comex:3,d:2360,cc:1263,cl:403,nota:"Libre disponible — pueblo mágico",market:{activo:null,precio:"—",notas:"Sin datos — verificar en FB"}}
+  ]}
+};
+
+const ALIAS={
+  "México":"Estado de México","Mexico":"Estado de México",
+  "Distrito Federal":"Ciudad de México","CDMX":"Ciudad de México",
+  "Coahuila de Zaragoza":"Coahuila","Michoacán de Ocampo":"Michoacán",
+  "Veracruz de Ignacio de la Llave":"Veracruz","Querétaro de Arteaga":"Querétaro"
+};
+function resolve(n){return ALIAS[n]||n;}
+function fillColor(nivel){
+  if(nivel==="alta") return "#00ff8822";
+  if(nivel==="media") return "#ffaa001e";
+  return "#ff55551a";
+}
+function borderCol(nivel){
+  if(nivel==="alta") return "#00ff88";
+  if(nivel==="media") return "#ffaa00";
+  return "#ff5555";
+}
+
+function fillGas(c){
+  if(c.d===0){
+    document.getElementById("cq-dist").textContent="— (estás aquí)";
+    document.getElementById("cq-gas").textContent="—";
+    document.getElementById("cq-casetas").textContent="—";
+    document.getElementById("cq-total").textContent="—";
+    document.getElementById("cl-dist").textContent="—";
+    document.getElementById("cl-gas").textContent="—";
+    document.getElementById("cl-casetas").textContent="—";
+    document.getElementById("cl-total").textContent="—";
+    document.getElementById("cl-nota").textContent="";
+    return;
+  }
+  const libreKm=Math.round(c.d*1.12);
+  const gasCuota=Math.round((c.d/KM_POR_LITRO)*MAGNA_PRECIO);
+  const gasLibre=Math.round((libreKm/KM_POR_LITRO)*MAGNA_PRECIO);
+  const totalCuota=gasCuota+c.cc;
+  const totalLibre=gasLibre+c.cl;
+  document.getElementById("cq-dist").textContent=c.d.toLocaleString("es-MX")+" km";
+  document.getElementById("cq-gas").textContent=fmt(gasCuota)+" ("+( c.d/KM_POR_LITRO).toFixed(1)+" L)";
+  document.getElementById("cq-casetas").textContent=c.cc>0?"~"+fmt(c.cc):"Sin casetas";
+  document.getElementById("cq-total").textContent=fmt(totalCuota);
+  document.getElementById("cl-dist").textContent=libreKm.toLocaleString("es-MX")+" km (+"+(libreKm-c.d)+" km)";
+  document.getElementById("cl-gas").textContent=fmt(gasLibre)+" ("+(libreKm/KM_POR_LITRO).toFixed(1)+" L)";
+  document.getElementById("cl-casetas").textContent=c.cl>0?"~"+fmt(c.cl)+" (obligatorias)":"Sin casetas";
+  document.getElementById("cl-total").textContent=fmt(totalLibre);
+  document.getElementById("cl-nota").textContent="Magna $"+MAGNA_PRECIO.toFixed(2)+"/L · "+KM_POR_LITRO+" km/L · "+(c.nota||"");
+}
+
+const map=L.map("map",{center:[24,-102],zoom:5});
+L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",{attribution:"&copy; CartoDB",subdomains:"abcd",maxZoom:19}).addTo(map);
+
+let gLayer,selState=null,cityMarkers=L.layerGroup().addTo(map),currentStateName=null;
+const cityIcon=L.divIcon({className:"",html:'<div style="width:10px;height:10px;border-radius:50%;background:#00d4ff;border:1px solid #003060;box-shadow:0 0 6px #00d4ff88"></div>',iconSize:[10,10],iconAnchor:[5,5]});
+
+function openPanel(){
+  document.getElementById("panel").classList.add("open");
+  document.getElementById("hint").style.display="none";
+  document.getElementById("close-panel").style.display="flex";
+  setTimeout(()=>map.invalidateSize(),350);
+}
+
+function showCityDetail(c,stateName){
+  document.getElementById("state-view").style.display="none";
+  document.getElementById("city-view").style.display="block";
+  document.getElementById("city-nombre").textContent=c.n;
+  document.getElementById("city-pob").textContent=stateName;
+  document.getElementById("city-hab").textContent=formatPop(c.p);
+  document.getElementById("city-area").textContent="~"+c.area+" km²";
+  document.getElementById("city-terrain").innerHTML=`<span class="badge ${terrainClass(c.terrain)}">${c.terrain}</span>`;
+  document.getElementById("city-security").innerHTML=`<span class="badge ${secClass(c.security)}">${c.security}</span>`;
+  document.getElementById("city-comex").textContent="~"+c.comex+" tiendas";
+  fillGas(c);
+  const a=c.market.activo;
+  document.getElementById("city-mkt-activo").innerHTML=
+    a===true?'<span class="mkt-si">SI — ya hay vendedores</span>':
+    a===false?'<span class="mkt-no">NO — sin competidores</span>':
+    '<span class="mkt-nd">No verificado</span>';
+  document.getElementById("city-mkt-precio").textContent=c.market.precio;
+  document.getElementById("city-mkt-notas").textContent=c.market.notas;
+  document.getElementById("city-dots").innerHTML=dotsHtml(c.v);
+  document.getElementById("city-gmaps").href=`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.n+", "+stateName+", México")}`;
+  map.flyTo([c.lat,c.lng],12,{duration:1.2});
+}
+
+function showStatePanel(name){
+  const d=ESTADOS[name];
+  openPanel();
+  document.getElementById("state-view").style.display="block";
+  document.getElementById("city-view").style.display="none";
+  document.getElementById("est-nombre").textContent=name;
+  const badge=document.getElementById("est-badge");
+  badge.className="badge "+(d?d.nivel:"baja");
+  badge.textContent=d?{alta:"ECONOMÍA ALTA",media:"ECONOMÍA MEDIA",baja:"ECONOMÍA BAJA"}[d.nivel]:"—";
+  document.getElementById("est-pob").textContent=d?d.pob:"—";
+  document.getElementById("est-gdp").textContent=d?d.gdp:"—";
+  document.getElementById("est-comex").textContent=d?d.comex:"—";
+  document.getElementById("est-mp").textContent=d?d.mp:"—";
+  cityMarkers.clearLayers();
+  const list=document.getElementById("ciudades");
+  list.innerHTML="";
+  if(!d)return;
+  [...d.ciudades].sort((a,b)=>b.p-a.p).forEach(c=>{
+    const card=document.createElement("div");
+    card.className="city-card";
+    const distTxt=c.d===0?"Origen (Cancún)":c.d.toLocaleString("es-MX")+" km de Cancún";
+    card.innerHTML=`
+      <div>
+        <div class="city-name">${c.n}</div>
+        <div class="city-sub">${formatPop(c.p)} &bull; ${distTxt}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:11px;color:#1a3a55;margin-bottom:4px">VIABILIDAD</div>
+        <div class="dots">${dotsHtml(c.v)}</div>
+      </div>`;
+    card.onclick=()=>showCityDetail(c,name);
+    list.appendChild(card);
+    const mk=L.marker([c.lat,c.lng],{icon:cityIcon}).addTo(cityMarkers);
+    mk.bindTooltip(c.n,{direction:"top"});
+    mk.on("click",()=>showCityDetail(c,name));
+  });
+}
+
+function closePanel(){
+  const panel=document.getElementById("panel");
+  panel.classList.remove("open");
+  document.getElementById("close-panel").style.display="none";
+  document.getElementById("hint").style.display="";
+  if(selState&&gLayer)gLayer.resetStyle(selState);
+  selState=null;
+  currentStateName=null;
+  cityMarkers.clearLayers();
+  setTimeout(()=>map.invalidateSize(),350);
+}
+
+document.getElementById("back-btn").onclick=()=>{
+  if(currentStateName){
+    document.getElementById("state-view").style.display="block";
+    document.getElementById("city-view").style.display="none";
+    const d=ESTADOS[currentStateName];
+    if(d&&d.ciudades.length){
+      const b=L.latLngBounds(d.ciudades.map(c=>[c.lat,c.lng]));
+      map.flyToBounds(b.pad(0.5),{duration:1});
+    }
+  }
+};
+
+document.getElementById("close-panel").onclick=closePanel;
+
+fetch("https://raw.githubusercontent.com/angelnmara/geojson/master/mexicoHigh.json")
+  .then(r=>r.json())
+  .then(geojson=>{
+    gLayer=L.geoJSON(geojson,{
+      style:feat=>{
+        const name=resolve(feat.properties.state||feat.properties.NAME||feat.properties.name||"");
+        const d=ESTADOS[name];
+        return{fillColor:fillColor(d?d.nivel:null),fillOpacity:0.5,color:borderCol(d?d.nivel:null),weight:1,opacity:0.7};
+      },
+      onEachFeature:(feat,layer)=>{
+        const rawName=feat.properties.state||feat.properties.NAME||feat.properties.name||"";
+        const name=resolve(rawName);
+        layer.bindTooltip(name,{sticky:true});
+        layer.on({
+          click:()=>{
+            if(selState)gLayer.resetStyle(selState);
+            selState=layer;
+            layer.setStyle({fillOpacity:0.75,weight:2});
+            currentStateName=name;
+            showStatePanel(name);
+          },
+          mouseover:e=>{if(e.target!==selState)e.target.setStyle({fillOpacity:0.65});},
+          mouseout: e=>{if(e.target!==selState)gLayer.resetStyle(e.target);}
+        });
+      }
+    }).addTo(map);
+  })
+  .catch(()=>{document.getElementById("hint").textContent="Error cargando mapa. Verifica tu conexión.";});
+</script>
+</body>
+</html>
